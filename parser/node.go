@@ -1547,7 +1547,7 @@ func (node *TriggerFuncExec) Format(buf *nodeBuffer) {
 	buf.Printf(")")
 }
 
-// Function represents a PostgreSQL CREATE FUNCTION statement
+// Function represents a PostgreSQL CREATE FUNCTION or CREATE PROCEDURE statement
 type Function struct {
 	Name       ObjectName
 	Args       []FunctionArg
@@ -1556,6 +1556,7 @@ type Function struct {
 	Language   string   // e.g., "plpgsql", "sql"
 	OrReplace  bool     // true if CREATE OR REPLACE FUNCTION
 	Options    []string // Additional options like VOLATILE, IMMUTABLE, etc.
+	Procedure  bool     // true for CREATE PROCEDURE, which has no return type
 }
 
 // FunctionArg represents a function argument

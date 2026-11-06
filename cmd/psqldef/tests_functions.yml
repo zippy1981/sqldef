@@ -768,3 +768,67 @@ DropOverloadedFunctionsNamesArgumentTypes:
   down: |
     CREATE FUNCTION calc(a integer) RETURNS integer AS $$ BEGIN RETURN a * 2; END; $$ LANGUAGE plpgsql;
     CREATE FUNCTION calc(a integer, b integer) RETURNS integer AS $$ BEGIN RETURN a + b; END; $$ LANGUAGE plpgsql;
+
+# CREATE PROCEDURE
+# https://www.postgresql.org/docs/current/sql-createprocedure.html
+
+CreateProcedure:
+  legacy_ignore_quotes: false
+  desired: |
+    CREATE TABLE orders (id integer PRIMARY KEY, status text);
+    CREATE PROCEDURE set_status(p_id integer, p_status text)
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+      UPDATE orders SET status = p_status WHERE id = p_id;
+    END;
+    $$;
+
+CreateProcedureAsBeforeLanguage:
+  legacy_ignore_quotes: false
+  desired: |
+    CREATE PROCEDURE noop() AS $$ BEGIN END; $$ LANGUAGE plpgsql;
+
+CreateProcedureWithOptions:
+  legacy_ignore_quotes: false
+  desired: |
+    CREATE PROCEDURE noop() LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$ BEGIN END; $$;
+
+ProcedureBodyChangeUsesCreateOrReplace:
+  legacy_ignore_quotes: false
+  enable_drop: false
+  current: |
+    CREATE PROCEDURE noop(x integer) LANGUAGE plpgsql AS $$ BEGIN PERFORM x + 1; END; $$;
+  desired: |
+    CREATE PROCEDURE noop(x integer) LANGUAGE plpgsql AS $$ BEGIN PERFORM x + 2; END; $$;
+  up: |
+    CREATE OR REPLACE PROCEDURE noop(x integer) LANGUAGE plpgsql AS $$ BEGIN PERFORM x + 2; END; $$;
+  down: |
+    CREATE OR REPLACE PROCEDURE noop(x integer) LANGUAGE plpgsql AS $$ BEGIN PERFORM x + 1; END; $$;
+
+DropProcedure:
+  legacy_ignore_quotes: false
+  enable_drop: true
+  current: |
+    CREATE PROCEDURE noop() LANGUAGE plpgsql AS $$ BEGIN END; $$;
+  desired: ""
+  up: |
+    DROP PROCEDURE public.noop;
+  down: |
+    CREATE PROCEDURE noop() LANGUAGE plpgsql AS $$ BEGIN END; $$;
+
+# CREATE OR REPLACE cannot turn a function into a procedure, so it is dropped
+# and recreated.
+FunctionToProcedureDropsAndRecreates:
+  legacy_ignore_quotes: false
+  enable_drop: true
+  current: |
+    CREATE FUNCTION noop() RETURNS void LANGUAGE plpgsql AS $$ BEGIN END; $$;
+  desired: |
+    CREATE PROCEDURE noop() LANGUAGE plpgsql AS $$ BEGIN END; $$;
+  up: |
+    DROP FUNCTION public.noop();
+    CREATE PROCEDURE noop() LANGUAGE plpgsql AS $$ BEGIN END; $$;
+  down: |
+    DROP PROCEDURE public.noop();
+    CREATE FUNCTION noop() RETURNS void LANGUAGE plpgsql AS $$ BEGIN END; $$;

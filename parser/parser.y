@@ -823,6 +823,42 @@ comment_statement:
       },
     }
   }
+| COMMENT_KEYWORD ON PROCEDURE object_name '(' function_args_opt ')' IS STRING
+  {
+    var obj []Ident
+    if !$4.Schema.IsEmpty() {
+      obj = []Ident{$4.Schema, $4.Name}
+    } else {
+      obj = []Ident{$4.Name}
+    }
+    $$ = &DDL{
+      Action: CommentOn,
+      Comment: &Comment{
+        ObjectType: "OBJECT_PROCEDURE",
+        Object: obj,
+        FunctionArgs: $6,
+        Comment: $9,
+      },
+    }
+  }
+| COMMENT_KEYWORD ON PROCEDURE object_name '(' function_args_opt ')' IS NULL
+  {
+    var obj []Ident
+    if !$4.Schema.IsEmpty() {
+      obj = []Ident{$4.Schema, $4.Name}
+    } else {
+      obj = []Ident{$4.Name}
+    }
+    $$ = &DDL{
+      Action: CommentOn,
+      Comment: &Comment{
+        ObjectType: "OBJECT_PROCEDURE",
+        Object: obj,
+        FunctionArgs: $6,
+        Comment: "",
+      },
+    }
+  }
 | COMMENT_KEYWORD ON TYPE table_name IS STRING
   {
     // Build Object as []Ident: [schema, type] or [type]
@@ -1654,6 +1690,52 @@ create_statement:
         Language: $10.Name,
         OrReplace: $2 != "",
         Options: $11,
+      },
+    }
+  }
+/* For PostgreSQL: CREATE [OR REPLACE] PROCEDURE - the CREATE FUNCTION formats without RETURNS */
+| CREATE or_replace_opt PROCEDURE object_name '(' function_args_opt ')' AS STRING LANGUAGE reserved_sql_id function_options_opt
+  {
+    $$ = &DDL{
+      Action: CreateFunction,
+      Function: &Function{
+        Name: $4,
+        Args: $6,
+        Body: $9,
+        Language: $11.Name,
+        OrReplace: $2 != "",
+        Options: $12,
+        Procedure: true,
+      },
+    }
+  }
+| CREATE or_replace_opt PROCEDURE object_name '(' function_args_opt ')' LANGUAGE reserved_sql_id AS STRING function_options_opt
+  {
+    $$ = &DDL{
+      Action: CreateFunction,
+      Function: &Function{
+        Name: $4,
+        Args: $6,
+        Body: $11,
+        Language: $9.Name,
+        OrReplace: $2 != "",
+        Options: $12,
+        Procedure: true,
+      },
+    }
+  }
+| CREATE or_replace_opt PROCEDURE object_name '(' function_args_opt ')' LANGUAGE reserved_sql_id function_options AS STRING
+  {
+    $$ = &DDL{
+      Action: CreateFunction,
+      Function: &Function{
+        Name: $4,
+        Args: $6,
+        Body: $12,
+        Language: $9.Name,
+        OrReplace: $2 != "",
+        Options: $10,
+        Procedure: true,
       },
     }
   }

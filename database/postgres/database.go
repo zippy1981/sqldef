@@ -910,7 +910,7 @@ func (d *PostgresDatabase) domains() ([]string, error) {
 	return ddls, nil
 }
 
-// functions fetches user-defined functions from the database
+// functions fetches user-defined functions and procedures from the database
 func (d *PostgresDatabase) functions() ([]string, error) {
 	// Query to get user-defined functions (excluding system functions and extension functions)
 	// We use pg_get_functiondef to get the complete function definition
@@ -918,13 +918,14 @@ func (d *PostgresDatabase) functions() ([]string, error) {
 	rows, err := d.db.Query(`
 		SELECT n.nspname AS func_schema,
 		       p.proname AS func_name,
+		       p.prokind AS func_kind,
 		       pg_get_functiondef(p.oid) AS func_def,
 		       pg_get_function_identity_arguments(p.oid) AS func_args,
 		       obj_description(p.oid, 'pg_proc') AS func_comment
 		FROM pg_catalog.pg_proc p
 		INNER JOIN pg_catalog.pg_namespace n ON p.pronamespace = n.oid
 		WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast', 'sys')
-		  AND p.prokind = 'f'
+		  AND p.prokind IN ('f', 'p')
 		  AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.classid = (SELECT oid FROM pg_catalog.pg_class WHERE relname = 'pg_proc') AND d.deptype = 'e')
 		ORDER BY n.nspname, p.proname, pg_get_function_identity_arguments(p.oid);
 	`)
@@ -935,9 +936,9 @@ func (d *PostgresDatabase) functions() ([]string, error) {
 
 	var ddls []string
 	for rows.Next() {
-		var funcSchema, funcName, funcDef, funcArgs string
+		var funcSchema, funcName, funcKind, funcDef, funcArgs string
 		var funcComment sql.NullString
-		if err := rows.Scan(&funcSchema, &funcName, &funcDef, &funcArgs, &funcComment); err != nil {
+		if err := rows.Scan(&funcSchema, &funcName, &funcKind, &funcDef, &funcArgs, &funcComment); err != nil {
 			return nil, err
 		}
 		if d.config.TargetSchema != nil && !slices.Contains(d.config.TargetSchema, funcSchema) {
@@ -953,9 +954,13 @@ func (d *PostgresDatabase) functions() ([]string, error) {
 
 		// Add comment if exists
 		if funcComment.Valid {
+			objectType := "FUNCTION"
+			if funcKind == "p" {
+				objectType = "PROCEDURE"
+			}
 			ddls = append(ddls, fmt.Sprintf(
-				"COMMENT ON FUNCTION %s.%s(%s) IS %s;",
-				d.quoteIdentifierIfNeeded(funcSchema), d.quoteIdentifierIfNeeded(funcName), funcArgs, schemaLib.StringConstant(funcComment.String),
+				"COMMENT ON %s %s.%s(%s) IS %s;",
+				objectType, d.quoteIdentifierIfNeeded(funcSchema), d.quoteIdentifierIfNeeded(funcName), funcArgs, schemaLib.StringConstant(funcComment.String),
 			))
 		}
 	}
