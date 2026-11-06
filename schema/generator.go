@@ -823,7 +823,7 @@ func (g *Generator) generateDDLs(desiredDDLs []DDL) ([]string, error) {
 		// path already emits. A name with a single function keeps the bare form,
 		// as do MySQL and SQL Server, which have no overloads to disambiguate
 		// and do not accept argument types there.
-		drop := dropFunctionStatement{d: g.dialect, name: currentFunction.name}
+		drop := dropFunctionStatement{d: g.dialect, name: currentFunction.name, procedure: currentFunction.procedure}
 		if g.mode == GeneratorModePostgres && g.isOverloadedFunctionName(currentFunction) {
 			drop = g.dropFunction(currentFunction)
 		}
@@ -2753,6 +2753,10 @@ func (g *Generator) functionReplacementDDL(current, desired *Function) (string, 
 // always prints canonical names. Any remaining mismatch is conservative and
 // falls back to DROP + CREATE.
 func (g *Generator) areSameFunctionSignature(a, b *Function) bool {
+	// CREATE OR REPLACE cannot turn a function into a procedure or back.
+	if a.procedure != b.procedure {
+		return false
+	}
 	// The grammar collapses RETURNS TABLE(...) to "TABLE", dropping the column
 	// list, so table-returning functions can never be proven replaceable.
 	if strings.EqualFold(a.returnType, "TABLE") || strings.EqualFold(b.returnType, "TABLE") {
@@ -2854,7 +2858,7 @@ func normalizePGFunctionType(typ string) string {
 // parameters are not part of the identity, so the bare form is kept when any
 // non-input argument is present.
 func (g *Generator) dropFunction(current *Function) dropFunctionStatement {
-	drop := dropFunctionStatement{d: g.dialect, name: current.name}
+	drop := dropFunctionStatement{d: g.dialect, name: current.name, procedure: current.procedure}
 	argTypes := make([]string, 0, len(current.args))
 	for _, arg := range current.args {
 		switch functionArgMode(arg.mode) {
@@ -2928,7 +2932,8 @@ func pgFunctionReturnType(f *Function) string {
 
 func (g *Generator) areSameFunctionDefinition(a, b *Function) bool {
 	// Compare function properties
-	if !g.areSameFunctionReturnType(a, b) ||
+	if a.procedure != b.procedure ||
+		!g.areSameFunctionReturnType(a, b) ||
 		(g.mode == GeneratorModePostgres && !g.areSameFunctionArgs(a, b, false)) ||
 		a.body != b.body ||
 		a.language != b.language {
@@ -3226,8 +3231,8 @@ func (g *Generator) generateNormalizedCommentStatement(comment *Comment) string 
 		} else {
 			objectClause = fmt.Sprintf("%s %s", sqlObjectType, strings.Join(parts, "."))
 		}
-	case "OBJECT_FUNCTION":
-		// FUNCTION has syntax: COMMENT ON FUNCTION [schema.]name(args) IS ...
+	case "OBJECT_FUNCTION", "OBJECT_PROCEDURE":
+		// FUNCTION and PROCEDURE have syntax: COMMENT ON FUNCTION [schema.]name(args) IS ...
 		funcSignature := g.buildFunctionSignature(comment)
 		objectClause = fmt.Sprintf("%s %s", sqlObjectType, funcSignature)
 	default:
@@ -7613,7 +7618,7 @@ func FilterFunctions(ddls []DDL, config database.GeneratorConfig, defaultSchema 
 				continue
 			}
 		case *Comment:
-			if strings.EqualFold(stmt.comment.ObjectType, "FUNCTION") && len(stmt.comment.Object) > 0 {
+			if (stmt.comment.ObjectType == "OBJECT_FUNCTION" || stmt.comment.ObjectType == "OBJECT_PROCEDURE") && len(stmt.comment.Object) > 0 {
 				schema := ""
 				if len(stmt.comment.Object) >= 2 {
 					schema = stmt.comment.Object[len(stmt.comment.Object)-2].Name

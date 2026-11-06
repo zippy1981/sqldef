@@ -289,6 +289,18 @@ CommentOnFunction:
   down: |
     COMMENT ON FUNCTION public.test_func() IS NULL;
 
+CommentOnProcedure:
+  legacy_ignore_quotes: false
+  current: |
+    CREATE PROCEDURE test_proc() LANGUAGE plpgsql AS $$ BEGIN END; $$;
+  desired: |
+    CREATE PROCEDURE test_proc() LANGUAGE plpgsql AS $$ BEGIN END; $$;
+    COMMENT ON PROCEDURE test_proc() IS 'This is a test procedure';
+  up: |
+    COMMENT ON PROCEDURE public.test_proc() IS 'This is a test procedure';
+  down: |
+    COMMENT ON PROCEDURE public.test_proc() IS NULL;
+
 CommentOnType:
   legacy_ignore_quotes: false
   current: |

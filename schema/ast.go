@@ -463,6 +463,7 @@ type Function struct {
 	language   string
 	orReplace  bool
 	options    []string // Additional options like IMMUTABLE, SECURITY DEFINER, SET timezone = 'UTC', etc.
+	procedure  bool
 }
 
 // FunctionArg is the schema-level representation of a function argument.

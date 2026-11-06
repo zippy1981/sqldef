@@ -284,6 +284,7 @@ func parseDDL(mode GeneratorMode, ddl string, stmt parser.Statement, defaultSche
 				language:   stmt.Function.Language,
 				orReplace:  stmt.Function.OrReplace,
 				options:    stmt.Function.Options,
+				procedure:  stmt.Function.Procedure,
 			}, nil
 		} else if stmt.Action == parser.CreateType {
 			enumValues := parseEnumValuesWithRename(ddl, stmt.Type.Type.EnumValues, mode)

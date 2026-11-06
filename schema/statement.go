@@ -582,12 +582,17 @@ type dropFunctionStatement struct {
 	name QualifiedName
 	// withArgs appends argTypes, which tell the function apart from its overloads, even when
 	// there are none. Without it the function is dropped by its name alone.
-	withArgs bool
-	argTypes []string
+	withArgs  bool
+	argTypes  []string
+	procedure bool
 }
 
 func (s dropFunctionStatement) Render() string {
-	ddl := "DROP FUNCTION " + s.d.escapeQualifiedName(s.name)
+	keyword := "DROP FUNCTION "
+	if s.procedure {
+		keyword = "DROP PROCEDURE "
+	}
+	ddl := keyword + s.d.escapeQualifiedName(s.name)
 	if s.withArgs {
 		ddl += "(" + strings.Join(s.argTypes, ", ") + ")"
 	}
